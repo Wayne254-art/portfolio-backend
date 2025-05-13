@@ -22,11 +22,11 @@ const Project = sequelize.define("Project", {
     },
     image: {
         type: DataTypes.STRING,
-        allowNull: true,
+        allowNull: false,
     },
     detailImage: {
         type: DataTypes.STRING,
-        allowNull: true,
+        allowNull: false,
     },
     videoLink: {
         type: DataTypes.STRING,
