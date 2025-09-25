@@ -254,45 +254,75 @@ class projectControllers {
         }
 
         try {
-            // ✅ Check in MySQL
-            const existingLike = await LikesSQL.findOne({
-                where: { visitorId, projectId },
+            let likeToggled = false;
+            let liked = false;
+
+            // ✅ First try MySQL
+            try {
+                const existingLike = await LikesSQL.findOne({
+                    where: { visitorId, projectId },
+                });
+
+                if (existingLike) {
+                    // 🔹 Remove from MySQL
+                    await existingLike.destroy();
+
+                    // 🔹 Update project likes count (MySQL)
+                    await ProjectSQL.increment({ likes: -1 }, { where: { projectId } });
+
+                    // 🔹 Also remove from Mongo
+                    await LikesMongo.findOneAndDelete({ visitorId, projectId });
+
+                    liked = false;
+                    likeToggled = true;
+                } else {
+                    // 🔹 Add to MySQL
+                    await LikesSQL.create({ visitorId, projectId });
+
+                    // 🔹 Update project likes count (MySQL)
+                    await ProjectSQL.increment({ likes: 1 }, { where: { projectId } });
+
+                    // 🔹 Also add to Mongo
+                    await LikesMongo.create({ visitorId, projectId });
+
+                    liked = true;
+                    likeToggled = true;
+                }
+            } catch (mysqlError) {
+                console.warn("⚠️ MySQL unavailable, falling back to MongoDB:", mysqlError.message);
+
+                // ✅ If MySQL fails, use Mongo only
+                const existingLike = await LikesMongo.findOne({ visitorId, projectId });
+
+                if (existingLike) {
+                    await LikesMongo.findOneAndDelete({ visitorId, projectId });
+                    liked = false;
+                    likeToggled = true;
+                } else {
+                    await LikesMongo.create({ visitorId, projectId });
+                    liked = true;
+                    likeToggled = true;
+                }
+            }
+
+            if (!likeToggled) {
+                return res.status(500).json({ message: "Could not toggle like in any database" });
+            }
+
+            return res.status(200).json({
+                liked,
+                message: liked ? "Project liked" : "Project unliked",
             });
 
-            if (existingLike) {
-                // ✅ Remove from MySQL
-                await existingLike.destroy();
-
-                // ✅ Update project likes count (MySQL)
-                await ProjectSQL.increment({ likes: -1 }, { where: { projectId } });
-
-                // ✅ Remove from MongoDB
-                await LikesMongo.findOneAndDelete({ visitorId, projectId });
-
-                return res
-                    .status(200)
-                    .json({ liked: false, message: "Project unliked" });
-            } else {
-                // ✅ Add to MySQL
-                await LikesSQL.create({ visitorId, projectId });
-
-                // ✅ Update project likes count (MySQL)
-                await ProjectSQL.increment({ likes: 1 }, { where: { projectId } });
-
-                // ✅ Add to MongoDB
-                await LikesMongo.create({ visitorId, projectId });
-
-                return res
-                    .status(201)
-                    .json({ liked: true, message: "Project liked" });
-            }
         } catch (error) {
             console.error("❌ Like toggle error:", error);
-            res
-                .status(500)
-                .json({ message: "Server error while toggling like", error: error.message });
+            res.status(500).json({
+                message: "Server error while toggling like",
+                error: error.message,
+            });
         }
-    }
+    };
+
 
 }
 module.exports = new projectControllers();
