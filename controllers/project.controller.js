@@ -264,7 +264,7 @@ class projectControllers {
                 await existingLike.destroy();
 
                 // ✅ Update project likes count (MySQL)
-                await Project.increment({ likes: -1 }, { where: { projectId } });
+                await ProjectSQL.increment({ likes: -1 }, { where: { projectId } });
 
                 // ✅ Remove from MongoDB
                 await LikesMongo.findOneAndDelete({ visitorId, projectId });
@@ -277,7 +277,7 @@ class projectControllers {
                 await LikesSQL.create({ visitorId, projectId });
 
                 // ✅ Update project likes count (MySQL)
-                await Project.increment({ likes: 1 }, { where: { projectId } });
+                await ProjectSQL.increment({ likes: 1 }, { where: { projectId } });
 
                 // ✅ Add to MongoDB
                 await LikesMongo.create({ visitorId, projectId });
@@ -293,5 +293,6 @@ class projectControllers {
                 .json({ message: "Server error while toggling like", error: error.message });
         }
     }
+
 }
 module.exports = new projectControllers();
