@@ -1,5 +1,8 @@
-const Likes = require("../models/likes.model");
-const Project = require("../models/project.model");
+const LikesSQL = require("../models/likes.model");
+const LikesMongo = require("../models/likes.mongo"); // Mongoose (MongoDB)
+const ProjectSQL = require("../models/project.model"); // Sequelize model
+const ProjectMongo = require("../models/project.mongo"); // Mongoose model
+const { v4: uuidv4 } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 
@@ -30,34 +33,58 @@ class projectControllers {
 
             if (projectId) {
                 // === Update Logic ===
-                const project = await Project.findByPk(projectId);
-                if (!project) {
+                const projectSQL = await ProjectSQL.findByPk(projectId);
+                const projectMongo = await ProjectMongo.findOne({ projectId });
+
+                if (!projectSQL || !projectMongo) {
                     return res.status(404).json({ message: "Project not found." });
                 }
 
                 // Delete old images if new ones are uploaded
-                if (uploadedImage && project.image) deleteOldFile(project.image);
-                if (uploadedDetailImage && project.detailImage) deleteOldFile(project.detailImage);
+                if (uploadedImage && projectSQL.image) deleteOldFile(projectSQL.image);
+                if (uploadedDetailImage && projectSQL.detailImage) deleteOldFile(projectSQL.detailImage);
 
-                const updated = await project.update({
-                    title: title || project.title,
-                    description: description || project.description,
-                    technologies: technologies || project.technologies,
-                    videoLink: videoLink || project.videoLink,
-                    liveSite: liveSite || project.liveSite,
-                    descriptions: descriptions || project.descriptions,
-                    image: uploadedImage || project.image,
-                    detailImage: uploadedDetailImage || project.detailImage,
+                // Update in SQL
+                const updatedSQL = await projectSQL.update({
+                    title: title || projectSQL.title,
+                    description: description || projectSQL.description,
+                    technologies: technologies || projectSQL.technologies,
+                    videoLink: videoLink || projectSQL.videoLink,
+                    liveSite: liveSite || projectSQL.liveSite,
+                    descriptions: descriptions || projectSQL.descriptions,
+                    image: uploadedImage || projectSQL.image,
+                    detailImage: uploadedDetailImage || projectSQL.detailImage,
                 });
 
-                return res.status(200).json(updated);
+                // Update in Mongo
+                await ProjectMongo.updateOne(
+                    { projectId },
+                    {
+                        $set: {
+                            title: title || projectMongo.title,
+                            description: description || projectMongo.description,
+                            technologies: technologies || projectMongo.technologies,
+                            videoLink: videoLink || projectMongo.videoLink,
+                            liveSite: liveSite || projectMongo.liveSite,
+                            descriptions: descriptions || projectMongo.descriptions,
+                            image: uploadedImage || projectMongo.image,
+                            detailImage: uploadedDetailImage || projectMongo.detailImage,
+                        },
+                    }
+                );
+
+                return res.status(200).json(updatedSQL);
             } else {
                 // === Creation Logic ===
                 if (!title || !description || !technologies || !liveSite || !descriptions) {
                     return res.status(400).json({ message: "Missing required fields." });
                 }
 
-                const newProject = await Project.create({
+                const newId = uuidv4();
+
+                // Create in SQL
+                const newProjectSQL = await ProjectSQL.create({
+                    projectId: newId,
                     title,
                     description,
                     technologies,
@@ -68,7 +95,21 @@ class projectControllers {
                     descriptions,
                 });
 
-                return res.status(201).json(newProject);
+                // Create in Mongo
+                const newProjectMongo = new ProjectMongo({
+                    projectId: newId,
+                    title,
+                    description,
+                    technologies,
+                    image: uploadedImage,
+                    detailImage: uploadedDetailImage,
+                    videoLink,
+                    liveSite,
+                    descriptions,
+                });
+                await newProjectMongo.save();
+
+                return res.status(201).json(newProjectSQL);
             }
         } catch (error) {
             console.error("Error creating/updating project:", error);
@@ -78,62 +119,178 @@ class projectControllers {
 
     get_projects = async (req, res) => {
         try {
-            const projects = await Project.findAll();
-            res.status(200).json(projects);
+            let projects;
+
+            // Try MySQL first
+            try {
+                projects = await ProjectSQL.findAll();
+                if (projects && projects.length > 0) {
+                    return res.status(200).json({
+                        source: "mysql",
+                        projects,
+                        count: projects.length
+                    });
+                }
+            } catch (mysqlError) {
+                console.warn("MySQL failed, falling back to MongoDB:", mysqlError.message);
+            }
+
+            // Fallback to Mongo
+            try {
+                projects = await ProjectMongo.find({}).lean();
+                if (projects && projects.length > 0) {
+                    return res.status(200).json({
+                        source: "mongo",
+                        projects,
+                        count: projects.length
+                    });
+                }
+            } catch (mongoError) {
+                console.warn("MongoDB failed:", mongoError.message);
+            }
+
+            // If both failed
+            return res.status(500).json({
+                message: "Unable to fetch projects from both MySQL and MongoDB."
+            });
+
         } catch (error) {
-            res.status(500).json({ message: "Server error", error });
+            console.error("Error fetching projects:", error);
+            return res.status(500).json({ message: "Server error", error });
         }
     }
 
     get_project_by_projectId = async (req, res) => {
+        const { projectId } = req.params;
+
         try {
-            const project = await Project.findByPk(req.params.projectId);
-            if (!project) {
-                return res.status(404).json({ message: "Project not found." });
+            let project;
+
+            // Try MySQL first
+            try {
+                project = await ProjectSQL.findByPk(projectId);
+                if (project) {
+                    return res.status(200).json({
+                        source: "mysql",
+                        project
+                    });
+                }
+            } catch (mysqlError) {
+                console.warn("MySQL lookup failed, falling back to MongoDB:", mysqlError.message);
             }
-            res.status(200).json(project);
+
+            // Try MongoDB fallback
+            try {
+                project = await ProjectMongo.findOne({ projectId }).lean();
+                if (project) {
+                    return res.status(200).json({
+                        source: "mongo",
+                        project
+                    });
+                }
+            } catch (mongoError) {
+                console.warn("MongoDB lookup failed:", mongoError.message);
+            }
+
+            // If neither found
+            return res.status(404).json({ message: "Project not found in either DB." });
+
         } catch (error) {
-            res.status(500).json({ message: "Server error", error });
+            console.error("Error fetching project by ID:", error);
+            return res.status(500).json({ message: "Server error", error });
         }
     }
 
     delete_project = async (req, res) => {
-        try {
-            const project = await Project.destroy({ where: { projectId: req.params.projectId } });
-            if (!project) {
-                return res.status(404).json({ message: "Project not found." });
-            }
-            res.status(200).json({ message: "Project deleted successfully." });
-        } catch (error) {
-            res.status(500).json({ message: "Server error", error });
-        }
+        const { projectId } = req.params;
 
+        try {
+            let deleted = false;
+
+            // Try MySQL first
+            try {
+                const sqlDelete = await ProjectSQL.destroy({ where: { projectId } });
+                if (sqlDelete) {
+                    deleted = true;
+                    return res.status(200).json({
+                        source: "mysql",
+                        message: "Project deleted successfully."
+                    });
+                }
+            } catch (mysqlError) {
+                console.warn("MySQL delete failed, falling back to MongoDB:", mysqlError.message);
+            }
+
+            // Try MongoDB fallback
+            try {
+                const mongoDelete = await ProjectMongo.findOneAndDelete({ projectId });
+                if (mongoDelete) {
+                    deleted = true;
+                    return res.status(200).json({
+                        source: "mongo",
+                        message: "Project deleted successfully."
+                    });
+                }
+            } catch (mongoError) {
+                console.warn("MongoDB delete failed:", mongoError.message);
+            }
+
+            // If not found in either DB
+            if (!deleted) {
+                return res.status(404).json({ message: "Project not found in either DB." });
+            }
+
+        } catch (error) {
+            console.error("Error deleting project:", error);
+            return res.status(500).json({ message: "Server error", error });
+        }
     }
 
     toggle_project_like = async (req, res) => {
         const { visitorId, projectId } = req.body;
 
         if (!visitorId || !projectId) {
-            return res.status(400).json({ message: 'Missing credentials' });
+            return res.status(400).json({ message: "Missing credentials" });
         }
 
         try {
-            const existingLike = await Likes.findOne({
+            // ✅ Check in MySQL
+            const existingLike = await LikesSQL.findOne({
                 where: { visitorId, projectId },
             });
 
             if (existingLike) {
+                // ✅ Remove from MySQL
                 await existingLike.destroy();
+
+                // ✅ Update project likes count (MySQL)
                 await Project.increment({ likes: -1 }, { where: { projectId } });
-                return res.status(200).json({ liked: false, message: 'Project unliked' });
+
+                // ✅ Remove from MongoDB
+                await LikesMongo.findOneAndDelete({ visitorId, projectId });
+
+                return res
+                    .status(200)
+                    .json({ liked: false, message: "Project unliked" });
             } else {
-                await Likes.create({ visitorId, projectId });
+                // ✅ Add to MySQL
+                await LikesSQL.create({ visitorId, projectId });
+
+                // ✅ Update project likes count (MySQL)
                 await Project.increment({ likes: 1 }, { where: { projectId } });
-                return res.status(201).json({ liked: true, message: 'Project liked' });
+
+                // ✅ Add to MongoDB
+                await LikesMongo.create({ visitorId, projectId });
+
+                return res
+                    .status(201)
+                    .json({ liked: true, message: "Project liked" });
             }
         } catch (error) {
-            console.error('Like toggle error:', error);
-            res.status(500).json({ message: 'Server error while toggling like' });
+            console.error("❌ Like toggle error:", error);
+            res
+                .status(500)
+                .json({ message: "Server error while toggling like", error: error.message });
         }
     }
 }
