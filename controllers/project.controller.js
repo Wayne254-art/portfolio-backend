@@ -321,8 +321,7 @@ class projectControllers {
                 error: error.message,
             });
         }
-    };
-
+    }
 
 }
 module.exports = new projectControllers();
