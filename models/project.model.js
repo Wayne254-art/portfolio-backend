@@ -1,52 +1,60 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require('../config/mysqldb');
+const mongoose = require("mongoose");
+const { v4: uuidv4 } = require("uuid");
 
-const Project = sequelize.define("Project", {
-    projectId: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        allowNull: false,
-        primaryKey: true,
-    },
-    title: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    description: {
-        type: DataTypes.TEXT,
-        allowNull: false,
-    },
-    technologies: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    image: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    detailImage: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    videoLink: {
-        type: DataTypes.STRING,
-        allowNull: true,
-    },
-    liveSite: {
-        type: DataTypes.STRING,
-        allowNull: false,
-    },
-    descriptions: {
-        type: DataTypes.JSON,
-        allowNull: false,
-    },
-    likes: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-    },
-}, {
-    tableName: 'projects',
-    timestamps: true,
-});
+const ProjectSchema = new mongoose.Schema(
+    {
+        projectId: {
+            type: String,
+            default: uuidv4,
+            unique: true,
+        },
 
-module.exports = Project;
+        title: {
+            type: String,
+            required: true,
+        },
+
+        description: {
+            type: String,
+            required: true,
+        },
+
+        technologies: {
+            type: String,
+            required: true,
+        },
+
+        image: {
+            type: String,
+            required: true,
+        },
+
+        detailImage: {
+            type: String,
+            required: true,
+        },
+
+        videoLink: {
+            type: String,
+            default: null,
+        },
+
+        liveSite: {
+            type: String,
+            required: true,
+        },
+
+        descriptions: {
+            type: Array, // JSON → Array
+            required: true,
+        },
+
+        likes: {
+            type: Number,
+            default: 0,
+        },
+    },
+    { timestamps: true }
+);
+
+module.exports = mongoose.model("Project", ProjectSchema);

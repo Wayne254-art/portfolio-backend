@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const sequelize = require("./config/mysqldb"); // MySQL
-const connectMongo = require("./config/mongodb"); // MongoDB
+const connectMongo = require("./config/mongodb"); // MongoDB only
 const cookieParser = require("cookie-parser");
 const path = require("path");
 require("dotenv").config();
@@ -32,21 +31,7 @@ app.use("/api", adminRoutes);
 app.use("/api", projectRoutes);
 app.use("/api", mailRoutes);
 
-// Connect MySQL
-sequelize
-    .authenticate()
-    .then(() => {
-        console.log("✅ MySQL connected successfully.");
-        return sequelize.sync();
-    })
-    .then(() => {
-        console.log("✅ Sequelize models synchronized with MySQL.");
-    })
-    .catch((err) => {
-        console.error("❌ MySQL connection error:", err.message);
-    });
-
-// Connect MongoDB
+// Connect MongoDB ONLY
 connectMongo();
 
 // Error handler

@@ -1,42 +1,51 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/mysqldb');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
 
-const Admin = sequelize.define('admin', {
+const AdminSchema = new mongoose.Schema({
     adminId: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        allowNull: false,
-        primaryKey: true,
+        type: String,
+        default: uuidv4,
+        unique: true,
     },
     name: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: String,
+        required: true,
         unique: true,
+        trim: true,
     },
     email: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: String,
+        required: true,
         unique: true,
+        lowercase: true,
+        trim: true,
     },
     password: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: String,
+        required: true,
     },
     role: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: 'admin',
+        type: String,
+        default: 'admin',
+        required: true,
     },
 }, {
-    tableName: 'admin',
     timestamps: true,
-    hooks: {
-        beforeCreate: async (admin) => {
-            const salt = await bcrypt.genSalt(10);
-            admin.password = await bcrypt.hash(admin.password, salt);
-        },
-    },
 });
 
-module.exports = Admin;
+// Hash password before saving
+AdminSchema.pre('save', async function (next) {
+    if (!this.isModified('password')) return next();
+
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+});
+
+// Method to compare passwords later
+AdminSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
+};
+
+module.exports = mongoose.model('Admin', AdminSchema);

@@ -1,5 +1,4 @@
-const Admin = require("../models/admin.model");       // Sequelize (MySQL)
-const AdminLog = require("../models/adminLog.model"); // Mongoose (MongoDB)
+const Admin = require("../models/admin.model"); // Mongoose only
 const bcrypt = require("bcryptjs");
 const { responseReturn } = require("../utils/response");
 const { createToken } = require("../utils/createToken");
@@ -9,40 +8,25 @@ class AdminControllers {
         const { email, password } = req.body;
 
         try {
-            // ✅ MySQL: find admin by email
-            const admin = await Admin.findOne({ where: { email } });
-
+            // 🔍 Find admin from MongoDB
+            const admin = await Admin.findOne({ email });
             if (!admin) {
                 return responseReturn(res, 404, { error: "Invalid Credentials" });
             }
 
-            // ✅ MySQL: compare password
+            // 🔐 Validate password
             const match = await bcrypt.compare(password, admin.password);
             if (!match) {
-                // log failed attempt in Mongo
-                await AdminLog.create({
-                    adminId: admin.adminId,
-                    action: "Failed Login",
-                    email,
-                });
-
                 return responseReturn(res, 401, { error: "Invalid Credentials" });
             }
 
-            // ✅ Generate JWT
+            // 🎫 Generate JWT token
             const token = await createToken({
                 id: admin.adminId,
                 role: admin.role,
             });
 
-            // ✅ Log successful login in Mongo
-            await AdminLog.create({
-                adminId: admin.adminId,
-                action: "Login",
-                email: admin.email,
-            });
-
-            // ✅ Set cookie
+            // 🍪 Set secure cookie
             res.cookie("accessToken", token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
@@ -50,12 +34,13 @@ class AdminControllers {
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             });
 
-            // ✅ Unified response
+            // 📤 Response
             return responseReturn(res, 200, {
                 token,
                 admin,
                 message: "Login successful",
             });
+
         } catch (error) {
             console.error("❌ Admin login error:", error);
             return responseReturn(res, 500, { error: error.message });

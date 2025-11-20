@@ -1,23 +1,22 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/mysqldb');
+const mongoose = require('mongoose');
+const { v4: uuidv4 } = require('uuid');
 
-const Likes = sequelize.define('Likes', {
+const LikesSchema = new mongoose.Schema({
     likeId: {
-        type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
-        primaryKey: true,
+        type: String,
+        default: uuidv4,
+        unique: true,
     },
     visitorId: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: String,
+        required: true,
     },
     projectId: {
-        type: DataTypes.STRING,
-        allowNull: false,
+        type: String,
+        required: true,
     },
 }, {
-    tableName: 'likes',
     timestamps: true,
 });
 
-module.exports = Likes;
+module.exports = mongoose.model('Likes', LikesSchema);
