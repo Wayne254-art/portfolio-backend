@@ -11,7 +11,7 @@ const app = express();
 app.use(cookieParser());
 
 const corsOptions = {
-    origin: ["http://localhost:5173", "https://wayne-marwa.web.app"],
+    origin: ["https://wayne-marwa.web.app", "http://localhost:5173", "http://192.168.1.104:5173"],
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
