@@ -1,5 +1,9 @@
-const jwt = require('jsonwebtoken')
+const jwt = require("jsonwebtoken");
+
 module.exports.createToken = async (data) => {
-    const token = await jwt.sign(data, process.env.JWT_SECRET, {expiresIn: '7d'})
-    return token
-}
+    if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET is not configured");
+    }
+
+    return jwt.sign(data, process.env.JWT_SECRET, { expiresIn: "7d" });
+};

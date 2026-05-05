@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const LikesSchema = new mongoose.Schema({
     likeId: {
         type: String,
-        default: uuidv4,
+        default: () => crypto.randomUUID(),
         unique: true,
     },
     visitorId: {
@@ -18,5 +18,7 @@ const LikesSchema = new mongoose.Schema({
 }, {
     timestamps: true,
 });
+
+LikesSchema.index({ visitorId: 1, projectId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Likes', LikesSchema);

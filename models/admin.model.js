@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const AdminSchema = new mongoose.Schema({
     adminId: {
         type: String,
-        default: uuidv4,
+        default: () => crypto.randomUUID(),
         unique: true,
     },
     name: {

@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
-const ProjectSchema = new mongoose.Schema(
+const InteriorProjectSchema = new mongoose.Schema(
     {
-        projectId: {
+        interiorProjectId: {
             type: String,
             default: () => crypto.randomUUID(),
             unique: true,
@@ -21,40 +21,37 @@ const ProjectSchema = new mongoose.Schema(
             trim: true,
             maxlength: 700,
         },
-        technologies: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: 300,
-        },
-        image: {
-            type: String,
-            required: true,
-            maxlength: 500,
-        },
-        detailImage: {
-            type: String,
-            required: true,
-            maxlength: 500,
-        },
-        videoLink: {
+        location: {
             type: String,
             trim: true,
-            maxlength: 500,
-            default: null,
+            maxlength: 120,
+            default: "",
         },
-        liveSite: {
+        category: {
+            type: String,
+            trim: true,
+            maxlength: 80,
+            default: "Interior Design",
+        },
+        coverImage: {
             type: String,
             required: true,
-            trim: true,
             maxlength: 500,
         },
-        descriptions: {
+        images: {
             type: [String],
             required: true,
             validate: {
-                validator: (items) => Array.isArray(items) && items.length > 0 && items.length <= 12,
-                message: "Project descriptions must include 1 to 12 items.",
+                validator: (items) => Array.isArray(items) && items.length > 0 && items.length <= 8,
+                message: "Interior project gallery must include 1 to 8 images.",
+            },
+        },
+        highlights: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: (items) => Array.isArray(items) && items.length <= 10,
+                message: "Interior project highlights must include 10 items or fewer.",
             },
         },
         likes: {
@@ -66,6 +63,6 @@ const ProjectSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-ProjectSchema.index({ createdAt: -1 });
+InteriorProjectSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model("Project", ProjectSchema);
+module.exports = mongoose.model("InteriorProject", InteriorProjectSchema);
